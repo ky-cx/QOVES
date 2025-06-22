@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # Redis service for Celery message broker and backend
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    
+  # PostgreSQL database for job tracking and caching
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-qoves_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  
+  # Prometheus server for monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+  
+  # The main FastAPI application service
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # Use environment variables to connect to other services
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-qoves_db}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      # Mount the app directory to allow for hot-reloading
+      - ./app:/app/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+  
+  # The Celery background worker service
+  worker:
+    build: .
+    environment:
+      # Worker needs the same environment variables to connect to DB and Redis
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-qoves_db}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+      - postgres
+      - app
+    volumes:
+      - ./app:/app/app
+    command: celery -A app.core.celery_app worker --loglevel=info
+
+volumes:
+  # Define a named volume for persisting database data
+  postgres_data:
