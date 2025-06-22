@@ -18,3 +18,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of your application's source code into the container
 COPY ./app /app/app
+
+# Directly copy the tests directory into the image
+COPY ./tests /app/tests
