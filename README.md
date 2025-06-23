@@ -57,7 +57,7 @@ This implementation successfully meets all **Advanced Criteria** by incorporatin
     ```
 
 3.  **The application is now running:**
-    * **API Service**: `http://localhost:8000`
+    * **API Service**: `http://localhost:8000/redoc`
     * **Interactive API Docs (Swagger UI)**: `http://localhost:8000/docs`
     * **Prometheus Monitoring**: `http://localhost:9090`
 
